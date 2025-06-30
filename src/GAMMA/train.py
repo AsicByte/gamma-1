@@ -67,9 +67,18 @@ def train_model(model_defs, input_arg, map_cstr=None, chkpt_file='./chkpt'):
     for dimension in model_defs:
         env.reset_dimension(fitness=fitness, constraints=constraints, dimension=dimension)
         env.reset_hw_parm(num_pe=opt.num_pe, l1_size=opt.l1_size, l2_size=opt.l2_size, pe_limit=opt.pe_limit,area_pebuf_only=False, external_area_model=True)
-        chkpt, pops = env.run(dimension, stage_idx=0, num_population=opt.num_pop, prev_stage_value=None,
-                                  num_generations=opt.epochs,
-                                  best_sol_1st=None, init_pop=None, bias=None, uni_base=True, use_factor=opt.use_factor, use_pleteau=False)
+        chkpt, pops = env.run(dimension, 
+                              stage_idx=0, 
+                              num_population=opt.num_pop, 
+                              prev_stage_value=None,
+                              num_generations=opt.epochs,
+                              best_sol_1st=None, 
+                              init_pop=None, 
+                              bias=None, 
+                              uni_base=True, 
+                              use_factor=opt.use_factor, 
+                              use_pleteau=False)
+
         best_sol = chkpt["best_sol"]
         best_runtime, best_throughput, best_energy, best_area, best_l1_size, best_l2_size, best_mac, best_power, best_num_pe = env.get_indiv_info(best_sol, num_pe=None)
         print("Mapping:", chkpt["best_sol"])

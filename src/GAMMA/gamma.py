@@ -80,6 +80,7 @@ class GAMMA(object):
         if external_area_model:
             self.external_area_model = external_area_model
 
+    # Computes all integer factors (i.e. tiling choices) of each dimension
     def get_dimension_factors(self, dimension_dict):
         dimension_factors = dict()
         for key, value in dimension_dict.items():
@@ -95,10 +96,13 @@ class GAMMA(object):
             self.fitness_objective =  fitness
         if constraints is not None:
             self.constraints = constraints
+        # Selects which mutation operators are active per GA run
         if constraint_class is not None:
             self.constraint_class = constraint_class
+        # Defines strict L1/L2 memory usage caps
         if external_mem_cstr is not None:
             self.external_mem_cstr = external_mem_cstr
+        # Ranking is a multi-objective fitness strategy that ranks individuals based on multiple objectives (letency, energy, area, etc) instead of using a weighted sum of scores.
         self.use_ranking = True if self.fitness_objective[0] == "ranking" else False
         self.dimension_dict = {"K": self.dimension[0], "C": self.dimension[1], "Y": self.dimension[2], "X": self.dimension[3], "R": self.dimension[4],"S": self.dimension[5], "T": self.dimension[6]}
         self.dimension_factors = self.get_dimension_factors(self.dimension_dict)
@@ -722,22 +726,27 @@ class GAMMA(object):
 
     def run(self, dimension, stage_idx=0, prev_stage_value=0, num_population=100, num_generations=100, elite_ratio=0.05,
                        parents_ratio=0.4, ratio_decay=1, num_finetune=1, best_sol_1st=None, init_pop=None, bias=None, uni_base=True, use_factor=False, use_pleteau=False, L1_bias_template=None):
+        # Initialization Setup
         self.init_arguement(dimension=dimension, stage_idx=stage_idx, prev_stage_value=prev_stage_value, num_population=num_population, num_generations=num_generations, elite_ratio=elite_ratio,
                        parents_ratio=parents_ratio, ratio_decay=ratio_decay, num_finetune=num_finetune, best_sol_1st=best_sol_1st, init_pop=init_pop,uni_base=uni_base, use_factor=use_factor, use_pleteau=use_pleteau,L1_bias_template=L1_bias_template)
         pool = Pool(min(self.num_population + self.num_elite, cpu_count()))
         population = self.reinit_pop(pool,self.num_population,  self.stage_idx, self.best_sol_1st, self.init_pop, bias=bias)
+        # Mapping Constraint Setup
         if self.map_cstr:
             self.cstr_list, self.num_free_order, self.num_free_par = self.map_cstr.get_cstr_list(copy.deepcopy(population[0]), fixed_sp_sz=self.fixedCluster)
+    
+        # Evolution Loop
         for g in range(num_generations):
-
             while self.num_parents < 1:  # restart
                 population = self.reinit_pop(pool, self.num_population, self.stage_idx, self.best_sol_1st, self.init_pop, cur_gen=g)
                 print("Reinitialize population")
-
+            
+            # Parent Selection
             population, self.fitness, self.parents = self.select_parents(population, self.fitness, self.num_parents, self.num_population,)
             elite = copy.deepcopy(self.parents[:self.num_elite])
             self.elite_fitness = copy.deepcopy(self.fitness[:(len(elite))])
 
+            # Crossover + Mutation
             # print(list(zip(self.elite_fitness, elite)))
             self.crossover_tile(self.parents, population, alpha=0.57)
             if self.constraint_class == "1000":
@@ -755,12 +764,12 @@ class GAMMA(object):
                 self.mutate_pe(population, alpha=1 if g==0 else 0.5) if self.num_pe<1 else None
                 self.mutate_par(population, alpha=0.1)
 
-
+            # Cluster Handling
             if self.map_cstr is None:
                 self.born_cluster(population, alpha=0.57)
                 self.kill_cluster(population, alpha=0.27)
 
-
+            # Constraint Correction
             # pop_inj, inj_fitness = self.injection()
             self.correctify_tile_dependency(population)
             # self.calculate_equivalent_num_pe(population)
@@ -768,6 +777,8 @@ class GAMMA(object):
             population = elite + population
             # population = elite + population + pop_inj
             self.fitness = np.concatenate((self.elite_fitness, self.fitness))
+            
+            # Evaluation
             # self.fitness = np.concatenate((self.elite_fitness, self.fitness, inj_fitness))
             chkpt = self.evaluate(pool=pool, population=population, cur_gen=g)
             # self.check_tile_dependency(population)
@@ -882,6 +893,9 @@ class GAMMA(object):
                 fo.write("}\n")
             fo.write("}")
 
+
+
+    # Trigger maestro for PPA value
     def oberserve_maestro(self, indv, num_pe=None, l1_size=None, l2_size=None, NocBW=None, offchipBW=None):
 
         m_file = "{}".format(random.randint(0, 2**32))
